@@ -8,12 +8,46 @@
 #include <string>
 #include <utility>
 #include <vector>
-
 using namespace caffe;  // NOLINT(build/namespaces)
 using std::string;
+using std::cout;
+using std::endl;
+using cv::Mat;
+
+const string LOG_DIR = "/Users/kareth/code/studia/piro/tmp/";
+const bool LOG_IMAGES = true;
+
+void LogImg(const Mat& img, const string& filename) {
+  if (LOG_IMAGES)
+    cv::imwrite(LOG_DIR + filename + ".jpg", img);
+}
 
 /* Pair (label, confidence) representing a prediction. */
 typedef std::pair<string, float> Prediction;
+
+enum SymbolType { N1, N2, N4, N8 };
+
+struct Symbol {
+  Symbol(SymbolType type, int position = 0) : type(type), position(position) {}
+  SymbolType type;
+  int position;
+};
+
+std::map<string, SymbolType> label_to_symbol_type = {
+  {"n1 Whole note", N1},
+  {"n2 Half note", N2},
+  {"n4 Quarter not", N4},
+  {"n8 Eighth note", N8}
+};
+
+class Line {
+ public:
+  Line(const vector<Symbol> symbols) : symbols_(symbols) {}
+  const vector<Symbol>& symbols() const { return symbols_; }
+  void Print() const { for (auto s : symbols_) cout << int(s.type) << ", "; cout << endl; }
+ private:
+  vector<Symbol> symbols_;
+};
 
 class Classifier {
  public:
@@ -31,8 +65,7 @@ class Classifier {
 
   void WrapInputLayer(std::vector<cv::Mat>* input_channels);
 
-  void Preprocess(const cv::Mat& img,
-                  std::vector<cv::Mat>* input_channels);
+  void Preprocess(const cv::Mat& img, std::vector<cv::Mat>* input_channels);
 
  private:
   shared_ptr<Net<float> > net_;
@@ -40,6 +73,108 @@ class Classifier {
   int num_channels_;
   cv::Mat mean_;
   std::vector<string> labels_;
+};
+
+class LineReader {
+ public:
+  LineReader(Classifier* classifier, const string& filename)
+      : classifier_(classifier) {
+    src_ = cv::imread(filename, -1);
+    if (!src_.data) std::cerr << "Problem loading image!!!" << endl;
+    if (src_.channels() == 3) {
+      cv::cvtColor(src_, gray_, CV_BGR2GRAY);
+    } else {
+      gray_ = src_.clone();
+    }
+  }
+
+  Line Read() {
+    SeparateLines();
+    SeparateSymbols();
+
+    vector<Symbol> symbols;
+    auto process_range = [&](int x, int y) {
+      Mat note = CropNote(notes_, x, y);
+      auto pred = classifier_->Classify(note, 5);
+      std::cout << pred[0].first << std::endl;
+      symbols.emplace_back(label_to_symbol_type[pred[0].first]);
+    };
+
+    ExtractRanges(vertical_, process_range);
+    return Line(symbols);
+  }
+
+ private:
+  Mat CropNote(const Mat& m, int start, int end) {
+    Mat cp = m.clone();
+    Mat crop = cp(cv::Rect(start, 0, end-start, notes_.rows));
+    LogImg(crop, "crop_" + std::to_string(cropped_notes_++));
+    return crop;
+  }
+
+  void ExtractRanges(const Mat& m, std::function<void(int, int)> emit) {
+    int l = 0, r = 0;
+    for (int x = 0; x < m.cols; x++) {
+      bool has_pixel = false;
+      for (int y = 0; y < m.rows; y++) {
+        uchar pixel = m.at<uchar>(y, x);
+        // TODO(pzurkowski) do normal thresholding and work on 0/1 image. Dilitate too?
+        if (pixel < 50) has_pixel = true;
+      }
+      if (has_pixel) {
+        r++;
+      } else {
+        if (l < r) emit(l, r);
+        r++;
+        l = r;
+      }
+    }
+
+    if (l < r) emit(l, r);
+  }
+
+  void SeparateLines() {
+    LogImg(gray_, "gray");
+    Mat bw;
+    cv::adaptiveThreshold(~gray_, bw, 255, CV_ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 15, -2);
+    LogImg(bw, "bit");
+    horizontal_ = bw.clone();
+    vertical_ = bw.clone();
+    // Specify size on horizontal axis
+    int horizontalsize = horizontal_.cols / 30;
+    // Create structure element for extracting horizontal lines through morphology operations
+    Mat horizontalStructure = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(horizontalsize,1));
+    // Apply morphology operations
+    cv::erode(horizontal_, horizontal_, horizontalStructure, cv::Point(-1, -1));
+    cv::dilate(horizontal_, horizontal_, horizontalStructure, cv::Point(-1, -1));
+    LogImg(horizontal_, "horizontal");
+    // Specify size on vertical axis
+    int verticalsize = vertical_.rows / 30;
+    // Create structure element for extracting vertical lines through morphology operations
+    Mat verticalStructure = cv::getStructuringElement(cv::MORPH_RECT, cv::Size( 1,verticalsize));
+    // Apply morphology operations
+    cv::erode(vertical_, vertical_, verticalStructure, cv::Point(-1, -1));
+    cv::dilate(vertical_, vertical_, verticalStructure, cv::Point(-1, -1));
+    // Show extracted vertical lines
+    cv::bitwise_not(vertical_, vertical_);
+    LogImg(vertical_, "vertical");
+  }
+
+  void SeparateSymbols() {
+    Mat lines;
+    vertical_.copyTo(lines, horizontal_);
+    notes_ = gray_ + lines + lines;
+    LogImg(notes_, "notes");
+  }
+
+ private:
+  Mat src_;
+  Mat gray_;
+  Mat horizontal_;
+  Mat vertical_;
+  Mat notes_;
+  int cropped_notes_ = 0;
+  Classifier* classifier_;
 };
 
 int main(int argc, char** argv) {
@@ -56,22 +191,31 @@ int main(int argc, char** argv) {
   string trained_file = argv[2];
   string mean_file    = argv[3];
   string label_file   = argv[4];
-  Classifier classifier(model_file, trained_file, mean_file, label_file);
 
-  string file = argv[5];
+  string filename = argv[5];
 
-  std::cout << "---------- Prediction for "
-            << file << " ----------" << std::endl;
+  string action = "LINE";
 
-  cv::Mat img = cv::imread(file, -1);
-  CHECK(!img.empty()) << "Unable to decode image " << file;
-  std::vector<Prediction> predictions = classifier.Classify(img);
+  if (action == "LINE") {
+    Classifier classifier(model_file, trained_file, mean_file, label_file);
+    LineReader reader(&classifier, filename);
+    reader.Read().Print();
+  } else {
+    Classifier classifier(model_file, trained_file, mean_file, label_file);
 
-  /* Print the top N predictions. */
-  for (size_t i = 0; i < predictions.size(); ++i) {
-    Prediction p = predictions[i];
-    std::cout << std::fixed << std::setprecision(4) << p.second << " - \""
-              << p.first << "\"" << std::endl;
+    std::cout << "---------- Prediction for "
+              << filename << " ----------" << std::endl;
+
+    cv::Mat img = cv::imread(filename, -1);
+    CHECK(!img.empty()) << "Unable to decode image " << filename;
+    std::vector<Prediction> predictions = classifier.Classify(img);
+
+    /* Print the top N predictions. */
+    for (size_t i = 0; i < predictions.size(); ++i) {
+      Prediction p = predictions[i];
+      std::cout << std::fixed << std::setprecision(4) << p.second << " - \""
+                << p.first << "\"" << std::endl;
+    }
   }
 }
 

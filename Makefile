@@ -251,7 +251,7 @@ ifeq ($(OSX), 1)
 		WARNINGS += -Wno-unneeded-internal-declaration
 	endif
 	# gtest needs to use its own tuple to not conflict with clang
-	COMMON_FLAGS += -DGTEST_USE_OWN_TR1_TUPLE=1
+	COMMON_FLAGS += -DGTEST_USE_OWN_TR1_TUPLE=1 -std=c++11
 	# boost::thread is called boost_thread-mt to mark multithreading on OS X
 	LIBRARIES += boost_thread-mt
 	# we need to explicitly ask for the rpath to be obeyed
