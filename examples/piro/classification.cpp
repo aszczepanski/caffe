@@ -96,7 +96,7 @@ class LineReader {
     auto process_range = [&](int x, int y) {
       Mat note = CropNote(notes_, x, y);
       auto pred = classifier_->Classify(note, 5);
-      std::cout << pred[0].first << std::endl;
+      std::cout << cropped_notes_-1 << " " << pred[0].first << std::endl;
       symbols.emplace_back(label_to_symbol_type[pred[0].first]);
     };
 
@@ -108,6 +108,8 @@ class LineReader {
   Mat CropNote(const Mat& m, int start, int end) {
     Mat cp = m.clone();
     Mat crop = cp(cv::Rect(start, 0, end-start, notes_.rows));
+    // TODO(aszczepanski): adjust border size
+    copyMakeBorder(crop.clone(), crop, 0, 0, 20, 20, cv::BORDER_CONSTANT, cv::Scalar(255));
     LogImg(crop, "crop_" + std::to_string(cropped_notes_++));
     return crop;
   }
