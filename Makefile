@@ -231,6 +231,8 @@ ifeq ($(LINUX), 1)
 	ifeq ($(shell echo | awk '{exit $(GCCVERSION) < 4.6;}'), 1)
 		WARNINGS += -Wno-uninitialized
 	endif
+	CXXFLAGS += -std=c++11
+	LINKFLAGS += -std=c++11
 	# boost::thread is reasonably called boost_thread (compare OS X)
 	# We will also explicitly add stdc++ to the link target.
 	LIBRARIES += boost_thread stdc++
