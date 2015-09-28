@@ -36,7 +36,7 @@ struct Symbol {
 std::map<string, SymbolType> label_to_symbol_type = {
   {"n1 Whole note", N1},
   {"n2 Half note", N2},
-  {"n4 Quarter not", N4},
+  {"n4 Quarter note", N4},
   {"n8 Eighth note", N8}
 };
 
@@ -48,6 +48,7 @@ class Line {
  private:
   vector<Symbol> symbols_;
 };
+
 
 class Classifier {
  public:
@@ -179,6 +180,17 @@ class LineReader {
   Classifier* classifier_;
 };
 
+class Visualization {
+ public:
+  Visualization(const Line& line) : line_(line) {}
+  void Save(const string& filename);
+
+ public:
+  string SymbolEntry(const Symbol& s);
+  Line line_;
+  static const string kHtmlTemplate;
+};
+
 int main(int argc, char** argv) {
   if (argc != 6) {
     std::cerr << "Usage: " << argv[0]
@@ -201,7 +213,10 @@ int main(int argc, char** argv) {
   if (action == "LINE") {
     Classifier classifier(model_file, trained_file, mean_file, label_file);
     LineReader reader(&classifier, filename);
-    reader.Read().Print();
+    auto line = reader.Read();
+    line.Print();
+    Visualization v(line);
+    v.Save("results/test.html");
   } else {
     Classifier classifier(model_file, trained_file, mean_file, label_file);
 
@@ -220,6 +235,26 @@ int main(int argc, char** argv) {
     }
   }
 }
+
+void Visualization::Save(const string& filename) {
+  FILE* file = fopen(filename.c_str(), "w");
+  string notes_list;
+  for (const auto& symbol : line_.symbols()) {
+    if (notes_list.size() != 0) notes_list += ", ";
+    notes_list += "\n" + SymbolEntry(symbol);
+  }
+  fprintf(file, kHtmlTemplate.c_str(), notes_list.c_str());
+  fclose(file);
+}
+
+string Visualization::SymbolEntry(const Symbol& s) {
+  string pitch = "c/4";
+  string duration = std::to_string(1 << int(s.type));
+  string base = "new Vex.Flow.StaveNote({ keys: [\"" + pitch + "\"], duration: \"" + duration + "\" })";
+  return base;
+}
+
+const string Visualization::kHtmlTemplate = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Score</title><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script><script src=\"libs/vexflow-min.js\"></script><script>$(document).ready(function(){var canvas = $(\"canvas\")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef(\"treble\").setContext(ctx).draw();var notes = [%s];Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>";
 
 Classifier::Classifier(const string& model_file,
                        const string& trained_file,
