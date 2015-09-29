@@ -7,7 +7,9 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <math.h>
 #include <vector>
+#include <numeric>
 using namespace caffe;  // NOLINT(build/namespaces)
 using std::string;
 using std::cout;
@@ -25,19 +27,50 @@ void LogImg(const Mat& img, const string& filename) {
 /* Pair (label, confidence) representing a prediction. */
 typedef std::pair<string, float> Prediction;
 
-enum SymbolType { N1, N2, N4, N8 };
+enum SymbolType {
+  N1, N2, N4, N8,  // Notes
+  R1, R2, R4, R8,  // Rests
+  TC, BC,          // Clefs
+  BAR,             // Bars
+  FA, SA           // Accidentals
+};
+
+struct Position {
+  Position(int x) : index_(x) {}
+  // IMPLICIT
+  operator int() const { return index_; }
+
+  string ToKeyAndOctave() const {
+    int octave = 4;
+    const vector<string> keys = {"c", "d", "e", "f", "g", "a", "b"};
+    int pos = index_ + 2; // 0 = e/4;
+    while (pos >= keys.size()) { pos -= keys.size(); octave++; }
+    while (pos < 0)            { pos += keys.size(); octave--; }
+    return keys[pos] + "/" + std::to_string(octave);
+  }
+  int index_;
+};
 
 struct Symbol {
   Symbol(SymbolType type, int position = 0) : type(type), position(position) {}
   SymbolType type;
-  int position;
+  Position position;
 };
 
 std::map<string, SymbolType> label_to_symbol_type = {
   {"n1 Whole note", N1},
   {"n2 Half note", N2},
   {"n4 Quarter note", N4},
-  {"n8 Eighth note", N8}
+  {"n8 Eighth note", N8},
+  {"r1 Whole rest", R1},
+  {"r2 Half rest", R2},
+  {"r4 Quarter rest", R4},
+  {"r8 Eighth rest", R8},
+  {"tc Treble clef", TC},
+  {"bc Bass clef", BC},
+  {"bar Bar line", BAR},
+  {"fa Flat accidental", FA},
+  {"sa Sharp accidental", SA}
 };
 
 class Line {
@@ -49,6 +82,17 @@ class Line {
   vector<Symbol> symbols_;
 };
 
+// Helper method
+vector<int> SumPixelsOverRows(const Mat& m) {
+  vector<int> row_pixels(m.rows);
+  for (int x = 0; x < m.cols; x++) {
+    for (int y = 0; y < m.rows; y++) {
+      uchar pixel = m.at<uchar>(y, x);
+      row_pixels[y] += pixel;
+    }
+  }
+  return row_pixels;
+}
 
 class Classifier {
  public:
@@ -97,8 +141,10 @@ class LineReader {
     auto process_range = [&](int x, int y) {
       Mat note = CropNote(notes_, x, y);
       auto pred = classifier_->Classify(note, 5);
-      std::cout << cropped_notes_-1 << " " << pred[0].first << std::endl;
-      symbols.emplace_back(label_to_symbol_type[pred[0].first]);
+      Symbol sym(label_to_symbol_type[pred[0].first]);
+      DetectHeight(&sym, note);
+      std::cout << cropped_notes_-1 << " " << pred[0].first << " " << pred[0].second << "\% pos: " << int(sym.position) << std::endl;
+      symbols.emplace_back(sym);
     };
 
     ExtractRanges(vertical_, process_range);
@@ -106,6 +152,33 @@ class LineReader {
   }
 
  private:
+
+  void DetectHeight(Symbol* symbol, const Mat& note_mat) {
+    auto t = symbol->type;
+    // Notes
+    if (t == N1 || t == N2 || t == N4 || t == N8) {
+      auto row_pixels = SumPixelsOverRows(note_mat);
+      // Count black pixels, not white
+      for (int& p : row_pixels) p = 255 * note_mat.cols - p;
+      // threshold on 30% of max value
+      int threshold = *std::max_element(row_pixels.begin(), row_pixels.end()) * 0.3;
+
+      for (int& p : row_pixels) if (p < threshold) p = 0;
+
+      vector<int> lines(note_mat.rows);
+      std::iota(lines.begin(), lines.end(), 0);
+      double weighted_line = std::inner_product(row_pixels.begin(), row_pixels.end(), lines.begin(), 0);
+      weighted_line /= std::accumulate(row_pixels.begin(), row_pixels.end(), 0);
+
+      symbol->position = GetPosition(weighted_line);
+
+      // LOG
+      Mat cp = note_mat.clone();
+      for (int x = 0; x < cp.cols; x++) cp.at<uchar>(int(weighted_line), x) = uchar(100);
+      LogImg(cp, "crop_" + std::to_string(cropped_notes_ - 1) + "+weight");
+    }
+  }
+
   Mat CropNote(const Mat& m, int start, int end) {
     Mat cp = m.clone();
     Mat crop = cp(cv::Rect(start, 0, end-start, notes_.rows));
@@ -151,6 +224,9 @@ class LineReader {
     cv::erode(horizontal_, horizontal_, horizontalStructure, cv::Point(-1, -1));
     cv::dilate(horizontal_, horizontal_, horizontalStructure, cv::Point(-1, -1));
     LogImg(horizontal_, "horizontal");
+
+    ExtractLinePositions(horizontal_);
+
     // Specify size on vertical axis
     int verticalsize = vertical_.rows / 30;
     // Create structure element for extracting vertical lines through morphology operations
@@ -163,11 +239,64 @@ class LineReader {
     LogImg(vertical_, "vertical");
   }
 
+  void ExtractLinePositions(const Mat& m) {
+    auto row_pixels = SumPixelsOverRows(m);
+
+    // threshold on 30% of max value
+    int threshold = *std::max_element(row_pixels.begin(), row_pixels.end()) * 0.3;
+
+    vector<pair<int, int>> candidates;
+    for (int r = 0; r < row_pixels.size(); r++)
+      if (row_pixels[r] > threshold)
+        candidates.emplace_back(r, row_pixels[r]);
+
+    if (candidates.size() > 5) {
+      for (int i = 0; i < candidates.size() - 1; i++) {
+        if (candidates[i].first + 1 == candidates[i+1].first) {
+          candidates[i+1].second = std::max(candidates[i].second, candidates[i+1].second);
+          candidates.erase(candidates.begin() + i);
+          i = 0;
+        }
+      }
+    }
+    for (const auto& c : candidates) line_positions_.push_back(c.first);
+    line_distance_ = double(line_positions_.back() - line_positions_[0])/ 4.;
+
+    // Set thresholds
+    for (int pos : line_positions_) {
+      line_thresholds_.push_back(double(pos) - line_distance_ / 4.);
+      line_thresholds_.push_back(double(pos) + line_distance_ / 4.);
+    }
+
+    for (double t : line_thresholds_) printf("%lf, ",t);
+    printf("\n");
+
+    printf("Lines on pixels: ");
+    for (const auto& c : candidates) printf("%d, ", c.first);
+    printf("\n");
+  }
+
   void SeparateSymbols() {
     Mat lines;
     vertical_.copyTo(lines, horizontal_);
     notes_ = gray_ + lines + lines;
     LogImg(notes_, "notes");
+  }
+
+  Position GetPosition(double position) {
+    if (position < line_thresholds_[0]) {
+      position = line_thresholds_[0] - position;
+      double step = line_distance_ / 2;
+      return 8 + ceil(position / step);
+    } else if (position > line_thresholds_.back()) {
+      position -= line_thresholds_.back();
+      double step = line_distance_ / 2;
+      return - ceil(position / step);
+    } else {
+      return 9 - (std::lower_bound(line_thresholds_.begin(),
+                                   line_thresholds_.end(),
+                                   position) - line_thresholds_.begin());
+    }
   }
 
  private:
@@ -178,6 +307,11 @@ class LineReader {
   Mat notes_;
   int cropped_notes_ = 0;
   Classifier* classifier_;
+
+  vector<int> line_positions_;
+
+  vector<double> line_thresholds_;
+  double line_distance_;
 };
 
 class Visualization {
@@ -240,18 +374,44 @@ void Visualization::Save(const string& filename) {
   FILE* file = fopen(filename.c_str(), "w");
   string notes_list;
   for (const auto& symbol : line_.symbols()) {
-    if (notes_list.size() != 0) notes_list += ", ";
-    notes_list += "\n" + SymbolEntry(symbol);
+    auto entry = SymbolEntry(symbol);
+    if (entry.size() > 0) {
+      if (notes_list.size() != 0) notes_list += ", ";
+      notes_list += "\n" + SymbolEntry(symbol);
+    }
   }
   fprintf(file, kHtmlTemplate.c_str(), notes_list.c_str());
   fclose(file);
 }
 
-string Visualization::SymbolEntry(const Symbol& s) {
-  string pitch = "c/4";
-  string duration = std::to_string(1 << int(s.type));
-  string base = "new Vex.Flow.StaveNote({ keys: [\"" + pitch + "\"], duration: \"" + duration + "\" })";
-  return base;
+string Visualization::SymbolEntry(const Symbol& symbol) {
+  const auto& type = symbol.type;
+  if (type == N1 || type == N2 || type == N4 || type == N8) {
+    //string pitch = "c/4";
+    string pitch = symbol.position.ToKeyAndOctave();
+    string duration = std::to_string(1 << int(type));
+    return "new Vex.Flow.StaveNote({ keys: [\"" + pitch + "\"], duration: \"" + duration + "\" })";
+  }
+
+  if (type == R1 || type == R2 || type == R4 || type == N8) {
+    string pitch = "b/4";
+    string duration = std::to_string(1 << (int(type) - 4)) + "r";
+    return "new Vex.Flow.StaveNote({ keys: [\"" + pitch + "\"], duration: \"" + duration + "\" })";
+  }
+
+  if (type == TC || type == BC) {
+    return "";
+  }
+
+  if (type == BAR) {
+    return "new Vex.Flow.BarNote()";
+  }
+
+  if (type == FA || type == SA) {
+    return "";
+  }
+  assert(false && "Unimplemented type");
+  return "";
 }
 
 const string Visualization::kHtmlTemplate = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Score</title><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script><script src=\"libs/vexflow-min.js\"></script><script>$(document).ready(function(){var canvas = $(\"canvas\")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef(\"treble\").setContext(ctx).draw();var notes = [%s];Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>";
