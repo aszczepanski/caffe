@@ -1,21 +1,15 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Score</title><script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="libs/vexflow-min.js"></script><script>$(document).ready(function(){var canvas = $("canvas")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef("treble").setContext(ctx).draw();
- notes0 = [
-new Vex.Flow.StaveNote({ keys: ["e/5"], duration: "8" }), 
-new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
-new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" })];
-notes1 = [
-new Vex.Flow.StaveNote({ keys: ["e/5"], duration: "8" }), 
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Score</title><script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="libs/vexflow-min.js"></script><script>$(document).ready(function(){var canvas = $("canvas")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);
+ stave.addClef("treble").setContext(ctx).draw();
+notes0 = [
+new Vex.Flow.StaveNote({ keys: ["g/4"], duration: "1" }), 
+new Vex.Flow.StaveNote({ keys: ["g/4"], duration: "4" }), 
+new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4" }), 
 new Vex.Flow.StaveNote({ keys: ["d/5"], duration: "8" }), 
-new Vex.Flow.StaveNote({ keys: ["c/5"], duration: "8" }), 
-new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "8" })];
-notes2 = [
-new Vex.Flow.StaveNote({ keys: ["a/4"], duration: "4" }), 
 new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
-new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
+new Vex.Flow.StaveNote({ keys: ["g/5"], duration: "2" }), 
 new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
 new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" })];
-notes = notes0.concat(notes1).concat(notes2);
-var beam0 = new Vex.Flow.Beam(notes1);
+notes = notes0;
 Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);
-beam0.setContext(ctx).draw(); 
+ 
 ;Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>

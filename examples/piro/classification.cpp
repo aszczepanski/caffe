@@ -175,7 +175,12 @@ class LineReader {
         i--;
         continue;
       }
-      note_boxes.push_back(SplitToNoteBoxes(notes_, ranges[i]));
+
+      if (i == 0) {
+        note_boxes.push_back({ranges[i]});
+      } else {
+        note_boxes.push_back(SplitToNoteBoxes(notes_, ranges[i]));
+      }
     }
 
     Mat rgb;
@@ -563,6 +568,7 @@ void Visualization::Save(const string& filename) {
   FILE* file = fopen(filename.c_str(), "w");
 
   vector<string> notes;
+  vector<string> clefs;
   vector<int> beams;
 
   string content;
@@ -573,23 +579,26 @@ void Visualization::Save(const string& filename) {
   for (int i = 0; i < line_.symbols().size(); i++) {
     auto& symbol = line_.symbols()[i];
 
-    auto entry = SymbolEntry(symbol);
-    if (entry.size() == 0) continue;
-    int group = line_.groups()[i];
+    if (symbol.type == TC) {
+      clefs.push_back("stave.addClef(\"treble\").setContext(ctx).draw();\n");
+    } else if (symbol.type == BC) {
+      clefs.push_back("stave.addClef(\"bass\").setContext(ctx).draw();\n");
+    } else {
+      auto entry = SymbolEntry(symbol);
+      if (entry.size() == 0) continue;
+      int group = line_.groups()[i];
 
-    if (group != current_group) {
-      if (current_notes.size() > 0)
-        notes.push_back(current_notes);
-      current_notes = "";
+      if (group != current_group) {
+        if (current_notes.size() > 0) notes.push_back(current_notes);
+        current_notes = "";
 
-      current_group = group;
+        current_group = group;
+        if (group != -1) beams.push_back(notes.size());
+      }
 
-      if (group != -1)
-        beams.push_back(notes.size());
+      if (current_notes.size() != 0) current_notes += ", ";
+      current_notes += "\n" + entry;
     }
-
-    if (current_notes.size() != 0) current_notes += ", ";
-    current_notes += "\n" + entry;
   }
 
   if (current_notes.size() > 0) notes.push_back(current_notes);
@@ -598,6 +607,8 @@ void Visualization::Save(const string& filename) {
   for (int i = 1; i < notes.size(); i++) concat += ".concat(notes" + std::to_string(i) + ")";
   concat += ";\n";
 
+  if (clefs.size() == 0) clefs.push_back("stave.addClef(\"treble\").setContext(ctx).draw();\n");
+  for (const auto& clef : clefs) content += clef;
   for (int i = 0 ; i < notes.size(); i++) content += "notes" + std::to_string(i) + " = [" + notes[i] + "];\n";
   content += concat;
   for (int i = 0; i < beams.size(); i++)
@@ -640,7 +651,7 @@ string Visualization::SymbolEntry(const Symbol& symbol) {
   return "";
 }
 
-const string Visualization::kHtmlTemplate = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Score</title><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script><script src=\"libs/vexflow-min.js\"></script><script>$(document).ready(function(){var canvas = $(\"canvas\")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef(\"treble\").setContext(ctx).draw();\n %s \n;Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>";
+const string Visualization::kHtmlTemplate = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Score</title><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script><script src=\"libs/vexflow-min.js\"></script><script>$(document).ready(function(){var canvas = $(\"canvas\")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);\n %s \n;Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>";
 
 
 //////////////////////////////////////////////////
