@@ -44,11 +44,11 @@ struct Position {
     int octave = 4;
     const vector<string> keys = {"c", "d", "e", "f", "g", "a", "b"};
     int pos = index_ + 2; // 0 = e/4;
-    while (pos >= keys.size()) { pos -= keys.size(); octave++; }
-    while (pos < 0)            { pos += keys.size(); octave--; }
+    while (pos >= keys.size() && octave <= 6) { pos -= keys.size(); octave++; }
+    while (pos < 0            && octave >= 3) { pos += keys.size(); octave--; }
     return keys[pos] + "/" + std::to_string(octave);
   }
-  int index_;
+  int index_ = 0;
 };
 
 struct Symbol {
@@ -138,20 +138,40 @@ class LineReader {
     SeparateSymbols();
 
     vector<Symbol> symbols;
+
+    Mat rgb;
+    cvtColor(notes_, rgb, CV_GRAY2RGB);
+    bool color = 0;
+
     auto process_range = [&](int x, int y) {
+      if (VerifyTrash(notes_, x, y)) return;
+
       Mat note = CropNote(notes_, x, y);
       auto pred = classifier_->Classify(note, 5);
       Symbol sym(label_to_symbol_type[pred[0].first]);
       DetectHeight(&sym, note);
       std::cout << cropped_notes_-1 << " " << pred[0].first << " " << pred[0].second << "\% pos: " << int(sym.position) << std::endl;
       symbols.emplace_back(sym);
+
+      for (int c = x; c <= y ; c++) {
+        for (int r = 0; r < rgb.rows; r++) {
+          rgb.at<cv::Vec3b>(r, c)[color] = 0;
+        }
+      }
+      color ^= 1;
     };
 
-    ExtractRanges(vertical_, process_range);
+    ExtractRanges(notes_, process_range);
+    LogImg(rgb, "argb");
+
     return Line(symbols);
   }
 
  private:
+
+  bool VerifyTrash(const Mat& mat, int x, int y) {
+    return false;
+  }
 
   void DetectHeight(Symbol* symbol, const Mat& note_mat) {
     auto t = symbol->type;
@@ -211,9 +231,11 @@ class LineReader {
 
   void SeparateLines() {
     LogImg(gray_, "gray");
+
     Mat bw;
-    cv::adaptiveThreshold(~gray_, bw, 255, CV_ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 15, -2);
+    cv::adaptiveThreshold(~gray_, bw, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 15, -2);
     LogImg(bw, "bit");
+
     horizontal_ = bw.clone();
     vertical_ = bw.clone();
     // Specify size on horizontal axis
@@ -277,10 +299,26 @@ class LineReader {
   }
 
   void SeparateSymbols() {
-    Mat lines;
+    /* Mat lines;
     vertical_.copyTo(lines, horizontal_);
     notes_ = gray_ + lines + lines;
+    LogImg(notes_, "notes"); */
+
+    Mat lines;
+    vertical_.copyTo(lines, horizontal_);
+    Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(1, 3));
+    cv::dilate(lines, lines, kernel, cv::Point(-1, -1));
+    LogImg(lines, "lines");
+    notes_ = gray_ + lines + lines;
+
+    kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::erode(notes_, notes_, kernel, cv::Point(-1, -1));
+
+    kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::dilate(notes_, notes_, kernel, cv::Point(-1, -1));
+
     LogImg(notes_, "notes");
+
   }
 
   Position GetPosition(double position) {

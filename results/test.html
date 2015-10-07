@@ -1,0 +1,10 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Score</title><script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="libs/vexflow-min.js"></script><script>$(document).ready(function(){var canvas = $("canvas")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef("treble").setContext(ctx).draw();var notes = [
+new Vex.Flow.StaveNote({ keys: ["c/4"], duration: "1" }), 
+new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
+new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
+new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
+new Vex.Flow.StaveNote({ keys: ["e/4"], duration: "1" }), 
+new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
+new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "4r" }), 
+new Vex.Flow.BarNote(), 
+new Vex.Flow.StaveNote({ keys: ["b/3"], duration: "2" })];Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>

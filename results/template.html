@@ -16,10 +16,10 @@
     var ctx = renderer.getContext();
     var stave = new Vex.Flow.Stave(10, 0, 1400);
     stave.addClef("treble").setContext(ctx).draw();
+    stave.addTimeSignature("4/4");
 
     var notes = [
-      new Vex.Flow.StaveNote({ keys: ["c/4"], duration: "q" }),
-      new Vex.Flow.StaveNote({ keys: ["d/4"], duration: "q" }),
+      new Vex.Flow.BarNote(3),
       new Vex.Flow.StaveNote({ keys: ["b/4"], duration: "qr" }),
       new Vex.Flow.StaveNote({ keys: ["c/4", "e/4", "g/4"], duration: "q" }),
 

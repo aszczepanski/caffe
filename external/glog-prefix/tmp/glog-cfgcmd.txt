@@ -1,0 +1,1 @@
+cmd='env;CFLAGS=-fPIC;CXXFLAGS=-fPIC;/Users/kareth/code/studia/piro/caffe/external/glog-prefix/src/glog/configure;--prefix=/Users/kareth/code/studia/piro/caffe/external/glog-install;--enable-shared=no;--enable-static=yes;--with-gflags=/Users/kareth/code/studia/piro/caffe/external/gflags-install/lib/..'
