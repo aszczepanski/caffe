@@ -15,6 +15,7 @@ using std::string;
 using std::cout;
 using std::endl;
 using cv::Mat;
+using std::max;
 
 const string LOG_DIR = "/Users/kareth/code/studia/piro/tmp/";
 const bool LOG_IMAGES = true;
@@ -146,32 +147,52 @@ class LineReader {
 
     ExtractRanges(notes_, process_range);
 
+    using NoteBox = vector<pair<int, int>>;
+
+    vector<NoteBox> note_boxes;
+
     for (int i = 0; i < ranges.size() - 1; i++) {
       if (ranges[i+1].first - ranges[i].second < line_distance_ / 2) {
         ranges[i].second = ranges[i+1].second;
         ranges.erase(ranges.begin() + i + 1);
         i--;
+        continue;
       }
+      note_boxes.push_back(SplitToNoteBoxes(notes_, ranges[i]));
     }
 
     Mat rgb;
     cvtColor(notes_, rgb, CV_GRAY2RGB);
     bool color = 0;
-    for (const auto& range : ranges) {
-      int x = range.first, y = range.second;
-      Mat note = CropNote(notes_, x, y);
-      auto pred = classifier_->Classify(note, 5);
-      Symbol sym(label_to_symbol_type[pred[0].first]);
-      DetectHeight(&sym, note);
-      std::cout << cropped_notes_-1 << " " << pred[0].first << " " << pred[0].second << "\% pos: " << int(sym.position) << std::endl;
-      symbols.emplace_back(sym);
+    for (const auto& box : note_boxes) {
+      bool multiple_notes = (box.size() > 1);
+      for (const auto& range : box) {
+        int x = range.first, y = range.second;
+        Mat note = CropNote(notes_, x, y);
 
-      for (int c = x; c <= y ; c++) {
-        for (int r = 0; r < rgb.rows; r++) {
-          rgb.at<cv::Vec3b>(r, c)[color] = 0;
+        std::vector<Prediction> predictions;
+
+        if (multiple_notes) {
+          Symbol sym(N8);
+          DetectHeight(&sym, note);
+          symbols.emplace_back(sym);
+        } else {
+          auto pred = classifier_->Classify(note, 5);
+          Symbol sym(label_to_symbol_type[pred[0].first]);
+          DetectHeight(&sym, note);
+          std::cout << cropped_notes_-1 << " " << pred[0].first << " " << pred[0].second << "\% pos: " << int(sym.position) << std::endl;
+          symbols.emplace_back(sym);
         }
+
+        for (int c = x; c <= y ; c++) {
+          for (int r = 0; r < rgb.rows; r++) {
+            rgb.at<cv::Vec3b>(r, c)[color] = 0;
+            if (multiple_notes)
+              rgb.at<cv::Vec3b>(r, c)[2] = 0;
+          }
+        }
+        color ^= 1;
       }
-      color ^= 1;
     }
     LogImg(rgb, "argb");
 
@@ -180,14 +201,55 @@ class LineReader {
 
  private:
 
+  vector<pair<int, int>> SplitToNoteBoxes(const Mat& m, const pair<int, int>& range) {
+    //return {range};
+    vector<int> head_areas;
+
+    for (int x = range.first; x <= range.second; x++) {
+      int longest = 0, l = 0;
+      for (int y = 0; y < m.rows; y++) {
+        if (m.at<uchar>(y, x) > 50) { // wgute
+          longest = max(longest, y - l);
+          l = y;
+        }
+      }
+      longest = max(longest, m.rows - 1 - l);
+      //printf("%d ",longest);
+
+      if (longest > line_distance_ / 2 &&
+          longest * 2 <= line_distance_ * 3)
+        head_areas.push_back(x);
+    }
+
+    vector<pair<int, int>> heads;
+
+    for (int i = 0; i < head_areas.size(); i++) {
+      int l = i, r = i;
+      while (r + 1 < head_areas.size() && head_areas[r+1] - head_areas[r] < 3) r++;
+      if (r - l + 1 > line_distance_ / 2) {
+        heads.emplace_back(head_areas[l], head_areas[r]);
+      }
+      i = r + 1;
+    }
+
+    printf("\nRange (%d, %d) -> ",range.first, range.second);
+    //for (int a : head_areas) printf("%d ",a); printf("\n");
+
+    for (const auto& h : heads) printf("<%d %d> ", h.first, h.second); printf("\n");
+
+    if (heads.size() > 1) {
+      return heads;
+    } else {
+      return {range};
+    }
+  }
+
   bool IsTrash(const Mat& m, int a, int b) {
-    Mat bw;
-    cv::adaptiveThreshold(m, bw, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 15, -2);
     int sum = 0;
     for (int x = a; x <= b; x++)
-      for (int y = 0; y < bw.rows; y++)
+      for (int y = 0; y < m.rows; y++)
         if (m.at<uchar>(y, x) < 50) sum++;
-    int all = (b - a + 1) * bw.rows;
+    int all = (b - a + 1) * m.rows;
     printf("%d of %d black\n", sum, all);
     return double(sum) / double(all) < 0.03;
   }
@@ -252,7 +314,7 @@ class LineReader {
     LogImg(gray_, "gray");
 
     Mat bw;
-    cv::adaptiveThreshold(~gray_, bw, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 15, -2);
+    cv::adaptiveThreshold(~gray_, bw, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 25, -2);
     LogImg(bw, "bit");
 
     horizontal_ = bw.clone();
@@ -291,15 +353,37 @@ class LineReader {
       if (row_pixels[r] > threshold)
         candidates.emplace_back(r, row_pixels[r]);
 
+    //for (const auto& c : candidates)
+    //  printf ("%d %d\n", c.first, c.second);
+
     if (candidates.size() > 5) {
       for (int i = 0; i < candidates.size() - 1; i++) {
-        if (candidates[i].first + 1 == candidates[i+1].first) {
-          candidates[i+1].second = std::max(candidates[i].second, candidates[i+1].second);
-          candidates.erase(candidates.begin() + i);
-          i = 0;
+        int l = i, r = i;
+        int sec = candidates[l].second;
+        while (r < candidates.size() - 1 &&
+               candidates[r+1].first - candidates[r].first <= 1) {
+          r++;
+          sec = std::min(sec, candidates[r+1].second);
         }
+        //printf("sum %d %d\n", candidates[l].first, candidates[r].first);
+        candidates[l].second = sec;
+        candidates[l].first = (candidates[l].first + candidates[r].first) / 2;
+
+        candidates.erase(candidates.begin() + l + 1, candidates.begin() + r + 1);
       }
     }
+
+    while (candidates.size() > 5) {
+      int m = 0;
+      for (int i = 0; i < candidates.size(); i++) {
+        if (candidates[i].second > candidates[m].second)
+          m = i;
+      }
+      candidates.erase(candidates.begin() + m);
+    }
+
+    //for (const auto& c : candidates)
+    //  printf ("%d %d\n", c.first, c.second);
     for (const auto& c : candidates) line_positions_.push_back(c.first);
     line_distance_ = double(line_positions_.back() - line_positions_[0])/ 4.;
 
@@ -336,8 +420,10 @@ class LineReader {
     kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
     cv::dilate(notes_, notes_, kernel, cv::Point(-1, -1));
 
+    notes_ = notes_ > 128;
     LogImg(notes_, "notes");
 
+    //LogImg(notes_bw, "notes_bw");
   }
 
   Position GetPosition(double position) {
