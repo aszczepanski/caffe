@@ -555,6 +555,10 @@ int main(int argc, char** argv) {
   }
 }
 
+//////////////////////////////////////////////////
+// Visualization
+//////////////////////////////////////////////////
+
 void Visualization::Save(const string& filename) {
   FILE* file = fopen(filename.c_str(), "w");
 
@@ -567,47 +571,44 @@ void Visualization::Save(const string& filename) {
   int current_group = -1;
 
   for (int i = 0; i < line_.symbols().size(); i++) {
+    auto& symbol = line_.symbols()[i];
+
     auto entry = SymbolEntry(symbol);
+    if (entry.size() == 0) continue;
     int group = line_.groups()[i];
 
-    auto entry = SymbolEntry(symbol);
+    if (group != current_group) {
+      if (current_notes.size() > 0)
+        notes.push_back(current_notes);
+      current_notes = "";
+
+      current_group = group;
+
+      if (group != -1)
+        beams.push_back(notes.size());
+    }
 
     if (current_notes.size() != 0) current_notes += ", ";
-    // TODO groups
-    //if (group != -1) {
-      current_notes += "\n" + entry;
-    //}
+    current_notes += "\n" + entry;
   }
 
   if (current_notes.size() > 0) notes.push_back(current_notes);
 
-  for (const auto& symbol : line_.symbols()) {
-    auto entry = SymbolEntry(symbol);
-    if (entry.size() > 0) {
-      if (notes_list.size() != 0) notes_list += ", ";
-      notes_list += "\n" + SymbolEntry(symbol);
-    }
-  }
-
   string concat = "notes = notes0";
   for (int i = 1; i < notes.size(); i++) concat += ".concat(notes" + std::to_string(i) + ")";
-  concat += ";";
+  concat += ";\n";
 
-  for (int i = 0 ; i < notes; i++) content += "notes" + std::to_string(i) + " = [" + notes[i] + "];";
+  for (int i = 0 ; i < notes.size(); i++) content += "notes" + std::to_string(i) + " = [" + notes[i] + "];\n";
   content += concat;
   for (int i = 0; i < beams.size(); i++)
-    content += "var beam" + std::to_string(i) + " = new Vex.Flow.Beam(notes" + std::to_string(beams[i]) + ");";
+    content += "var beam" + std::to_string(i) + " = new Vex.Flow.Beam(notes" + std::to_string(beams[i]) + ");\n";
 
-  content += "Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);"
+  content += "Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);\n";
   for (int i = 0; i < beams.size(); i++) content += "beam" + std::to_string(i) + ".setContext(ctx).draw();";
 
   fprintf(file, kHtmlTemplate.c_str(), content.c_str());
   fclose(file);
 }
-
-//////////////////////////////////////////////////
-// Visualization
-//////////////////////////////////////////////////
 
 string Visualization::SymbolEntry(const Symbol& symbol) {
   const auto& type = symbol.type;
@@ -639,7 +640,7 @@ string Visualization::SymbolEntry(const Symbol& symbol) {
   return "";
 }
 
-const string Visualization::kHtmlTemplate = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Score</title><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script><script src=\"libs/vexflow-min.js\"></script><script>$(document).ready(function(){var canvas = $(\"canvas\")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef(\"treble\").setContext(ctx).draw(); %s ;Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>";
+const string Visualization::kHtmlTemplate = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Score</title><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script><script src=\"libs/vexflow-min.js\"></script><script>$(document).ready(function(){var canvas = $(\"canvas\")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef(\"treble\").setContext(ctx).draw();\n %s \n;Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>";
 
 
 //////////////////////////////////////////////////
