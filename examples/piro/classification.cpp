@@ -140,7 +140,7 @@ class LineReader {
     vector<Symbol> symbols;
     vector<pair<int, int>> ranges;
     auto process_range = [&](int x, int y) {
-      if (!VerifyTrash(notes_, x, y))
+      if (!IsTrash(notes_, x, y))
         ranges.emplace_back(x, y);
     };
 
@@ -180,8 +180,16 @@ class LineReader {
 
  private:
 
-  bool VerifyTrash(const Mat& mat, int x, int y) {
-    return false;
+  bool IsTrash(const Mat& m, int a, int b) {
+    Mat bw;
+    cv::adaptiveThreshold(m, bw, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 15, -2);
+    int sum = 0;
+    for (int x = a; x <= b; x++)
+      for (int y = 0; y < bw.rows; y++)
+        if (m.at<uchar>(y, x) < 50) sum++;
+    int all = (b - a + 1) * bw.rows;
+    printf("%d of %d black\n", sum, all);
+    return double(sum) / double(all) < 0.03;
   }
 
   void DetectHeight(Symbol* symbol, const Mat& note_mat) {
