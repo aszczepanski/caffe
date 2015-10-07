@@ -138,14 +138,27 @@ class LineReader {
     SeparateSymbols();
 
     vector<Symbol> symbols;
+    vector<pair<int, int>> ranges;
+    auto process_range = [&](int x, int y) {
+      if (!VerifyTrash(notes_, x, y))
+        ranges.emplace_back(x, y);
+    };
+
+    ExtractRanges(notes_, process_range);
+
+    for (int i = 0; i < ranges.size() - 1; i++) {
+      if (ranges[i+1].first - ranges[i].second < line_distance_ / 2) {
+        ranges[i].second = ranges[i+1].second;
+        ranges.erase(ranges.begin() + i + 1);
+        i--;
+      }
+    }
 
     Mat rgb;
     cvtColor(notes_, rgb, CV_GRAY2RGB);
     bool color = 0;
-
-    auto process_range = [&](int x, int y) {
-      if (VerifyTrash(notes_, x, y)) return;
-
+    for (const auto& range : ranges) {
+      int x = range.first, y = range.second;
       Mat note = CropNote(notes_, x, y);
       auto pred = classifier_->Classify(note, 5);
       Symbol sym(label_to_symbol_type[pred[0].first]);
@@ -159,9 +172,7 @@ class LineReader {
         }
       }
       color ^= 1;
-    };
-
-    ExtractRanges(notes_, process_range);
+    }
     LogImg(rgb, "argb");
 
     return Line(symbols);
