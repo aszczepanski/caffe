@@ -77,10 +77,27 @@ std::map<string, SymbolType> label_to_symbol_type = {
 class Line {
  public:
   Line(const vector<Symbol> symbols) : symbols_(symbols) {}
+  Line(const vector<vector<Symbol>> symbol_groups) {
+    int group_id = 0;
+    for (const auto& g : symbol_groups) {
+      if (g.size() == 1) {
+        symbols_.push_back(g[0]);
+        groups_.push_back(-1);
+      } else {
+        for (const auto& s : g) {
+          symbols_.push_back(s);
+          groups_.push_back(group_id);
+        }
+        group_id++;
+      }
+    }
+  }
   const vector<Symbol>& symbols() const { return symbols_; }
+  const vector<int>& groups() const { return groups_; }
   void Print() const { for (auto s : symbols_) cout << int(s.type) << ", "; cout << endl; }
  private:
   vector<Symbol> symbols_;
+  vector<int> groups_;
 };
 
 // Helper method
@@ -138,7 +155,7 @@ class LineReader {
     SeparateLines();
     SeparateSymbols();
 
-    vector<Symbol> symbols;
+    vector<vector<Symbol>> symbols;
     vector<pair<int, int>> ranges;
     auto process_range = [&](int x, int y) {
       if (!IsTrash(notes_, x, y))
@@ -166,6 +183,9 @@ class LineReader {
     bool color = 0;
     for (const auto& box : note_boxes) {
       bool multiple_notes = (box.size() > 1);
+
+      vector<Symbol> symbol_group;
+
       for (const auto& range : box) {
         int x = range.first, y = range.second;
         Mat note = CropNote(notes_, x, y);
@@ -175,13 +195,13 @@ class LineReader {
         if (multiple_notes) {
           Symbol sym(N8);
           DetectHeight(&sym, note);
-          symbols.emplace_back(sym);
+          symbol_group.emplace_back(sym);
         } else {
           auto pred = classifier_->Classify(note, 5);
           Symbol sym(label_to_symbol_type[pred[0].first]);
           DetectHeight(&sym, note);
           std::cout << cropped_notes_-1 << " " << pred[0].first << " " << pred[0].second << "\% pos: " << int(sym.position) << std::endl;
-          symbols.emplace_back(sym);
+          symbol_group.emplace_back(sym);
         }
 
         for (int c = x; c <= y ; c++) {
@@ -193,6 +213,7 @@ class LineReader {
         }
         color ^= 1;
       }
+      symbols.push_back(symbol_group);
     }
     LogImg(rgb, "argb");
 
@@ -265,6 +286,27 @@ class LineReader {
       int threshold = *std::max_element(row_pixels.begin(), row_pixels.end()) * 0.3;
 
       for (int& p : row_pixels) if (p < threshold) p = 0;
+
+      // Find largest segment of pixels
+      int best = 0, bestsize = 0, now = 0;
+      for (int i = 0; i < row_pixels.size(); i++) {
+        if (row_pixels[i] == 0) {
+          if (i - now > bestsize) {
+            bestsize = i - now;
+            best = now;
+          }
+          now = i+1;
+        }
+      }
+      if (row_pixels.size() - now > bestsize) {
+        bestsize = row_pixels.size() - now;
+        best = now;
+      }
+
+      // Remove lines other than largest segment
+      for (int i = 0; i < row_pixels.size(); i++)
+        if (i < best || i >= best + bestsize)
+          row_pixels[i] = 0;
 
       vector<int> lines(note_mat.rows);
       std::iota(lines.begin(), lines.end(), 0);
@@ -515,7 +557,30 @@ int main(int argc, char** argv) {
 
 void Visualization::Save(const string& filename) {
   FILE* file = fopen(filename.c_str(), "w");
-  string notes_list;
+
+  vector<string> notes;
+  vector<int> beams;
+
+  string content;
+
+  string current_notes;
+  int current_group = -1;
+
+  for (int i = 0; i < line_.symbols().size(); i++) {
+    auto entry = SymbolEntry(symbol);
+    int group = line_.groups()[i];
+
+    auto entry = SymbolEntry(symbol);
+
+    if (current_notes.size() != 0) current_notes += ", ";
+    // TODO groups
+    //if (group != -1) {
+      current_notes += "\n" + entry;
+    //}
+  }
+
+  if (current_notes.size() > 0) notes.push_back(current_notes);
+
   for (const auto& symbol : line_.symbols()) {
     auto entry = SymbolEntry(symbol);
     if (entry.size() > 0) {
@@ -523,9 +588,26 @@ void Visualization::Save(const string& filename) {
       notes_list += "\n" + SymbolEntry(symbol);
     }
   }
-  fprintf(file, kHtmlTemplate.c_str(), notes_list.c_str());
+
+  string concat = "notes = notes0";
+  for (int i = 1; i < notes.size(); i++) concat += ".concat(notes" + std::to_string(i) + ")";
+  concat += ";";
+
+  for (int i = 0 ; i < notes; i++) content += "notes" + std::to_string(i) + " = [" + notes[i] + "];";
+  content += concat;
+  for (int i = 0; i < beams.size(); i++)
+    content += "var beam" + std::to_string(i) + " = new Vex.Flow.Beam(notes" + std::to_string(beams[i]) + ");";
+
+  content += "Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);"
+  for (int i = 0; i < beams.size(); i++) content += "beam" + std::to_string(i) + ".setContext(ctx).draw();";
+
+  fprintf(file, kHtmlTemplate.c_str(), content.c_str());
   fclose(file);
 }
+
+//////////////////////////////////////////////////
+// Visualization
+//////////////////////////////////////////////////
 
 string Visualization::SymbolEntry(const Symbol& symbol) {
   const auto& type = symbol.type;
@@ -557,7 +639,12 @@ string Visualization::SymbolEntry(const Symbol& symbol) {
   return "";
 }
 
-const string Visualization::kHtmlTemplate = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Score</title><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script><script src=\"libs/vexflow-min.js\"></script><script>$(document).ready(function(){var canvas = $(\"canvas\")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef(\"treble\").setContext(ctx).draw();var notes = [%s];Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>";
+const string Visualization::kHtmlTemplate = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Score</title><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script><script src=\"libs/vexflow-min.js\"></script><script>$(document).ready(function(){var canvas = $(\"canvas\")[0];var renderer = new Vex.Flow.Renderer(canvas,Vex.Flow.Renderer.Backends.CANVAS);var ctx = renderer.getContext();var stave = new Vex.Flow.Stave(10, 0, 1400);stave.addClef(\"treble\").setContext(ctx).draw(); %s ;Vex.Flow.Formatter.FormatAndDraw(ctx, stave, notes);})</script></head><body><canvas width=1400 height=100></canvas></body></html>";
+
+
+//////////////////////////////////////////////////
+// Classificationn
+//////////////////////////////////////////////////
 
 Classifier::Classifier(const string& model_file,
                        const string& trained_file,
