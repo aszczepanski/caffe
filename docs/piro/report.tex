@@ -20,9 +20,13 @@
 
 \section{Zasada działania}
 
-TODO Opis technologii
-TODO kompilacja
-TODO output
+Projekt napisany jest w C++. Aby skompilować kod wystarczy wywołać komendę make.
+
+Aby uruchomić program, należy wywołać go z parametrami plików modelu i plikiem wejściowym
+
+build/examples/piro/classification.bin PrototxtFile CaffeModel BinaryProtoFile SynsetWordsFile InputFile
+
+Jako wynik, wyprodukowany zostanie plik html w folderze results. Otworzony w przeglądarce wygeneruje wizualizację nut.
 
 \section{Wspierane znaki}
 
@@ -103,6 +107,13 @@ Znajdowany jest najdłuższy przedział i jest traktowany jako główka nuty
 Dla znalezionego już przedziału, liczy się środek ciężkości jako wyznacznik położenia nuty.
 
 Mając przewidywane położenie nuty, sprawdza się przynależność do przedziałów i przypisuję wysokość nucie.
+
+\subsection{Wizualizacja}
+Do wizualizacji wykorzystywana jest biblioteka VecFlow, pozwalająca na renderowanie pięciolinii w przeglądarce, za pomocą JavaScript.
+Kod generuje gotowy plik html, z kodem w JS generujący gotową pięciolinię.
+Wygenerowane nuty, mogą wizualnie różnić się od tych czytanych,
+np. pionowa kreska nuty może być skierowana w dół a nie w górę, itd. ponieważ algorytm rysowania sam dobiera takie parametry.
+Merytorycznie jednak, wygenerowane nuty mają takie same znaczenie.
 
 \section{Podsumowanie}
 
