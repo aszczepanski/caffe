@@ -20,9 +20,42 @@
 
 \section{Zasada działania}
 
+TODO Opis technologii
+TODO kompilacja
+TODO output
+
 \section{Wspierane znaki}
 
+Algorytm wspiera poniższy zbiór symboli muzycznych
+\begin{itemize}
+\item Klucze
+  \begin{itemize}
+  \item Klucz wiolinowy
+  \item Klucz basowy
+  \end{itemize}
+\item Nuty
+  \begin{itemize}
+  \item Pełna nuta
+  \item Półnuta
+  \item Ćwierćnuta
+  \item Ósemka
+  \item Połączone ósemki
+  \end{itemize}
+\item Pauza ćwierćnutowa
+\item Kreska taktowa
+\end{itemize}
+
 \section{Opis algorytmu}
+
+Algorytm składa się z kilku kroków, zaczynając od obrazu z pojedynczą pięciolinią.
+\begin{itemize}
+\item Wstępne przetwarzanie obrazu
+\item Wykrywanie pięciolinii i wyodrębnianie symoli z obrazu
+\item Segmentacja symboli
+\item Rozpoznawanie symboli
+\item Wykrywanie wysokości
+\item Wizualizacja
+\end{itemize}
 
 \subsection{Wykrywanie linii i nut}
 Pierwszym krokiem algorytmu jest znalezienie i usunięcie pięciolini z obrazu.
@@ -49,7 +82,7 @@ Jako kolejny krok, wykonywane jest sprawdzenie, czy grupa zawiera pojedynczy sym
 Przy obserwacji, że połączone nuty zawsze są pełne w środku, można podjąć się szukania główek nut w grupach jako wyznacznik czy grupa jest pojedynczym symbolem czy grupą nut.
 
 Wyszukiwanie główek nut, odbywa się poprzez znalezienie w każdej kolumnie najdłuższego ciągu czarnych pixeli.
-Kandydatami są ciąci o długości większej niż połowa wysokości linii, i mniejszej niż półtora wysokości linii.
+Kandydatami są ciągi o długości większej niż połowa wysokości linii, i mniejszej niż półtora wysokości linii.
 kandydaci grupowani są w grupy, jeśli są odległe od siebie nie więcej niż 2 pixele (dopuszczenie szumów).
 Kandydatami pozostają grupy, które są szerokie na przynajmniej połowę szerokości linii.
 W ten sposób otrzymujemy listę możliwych główek nut.  Jeśli lista zawiera więcej niż jedną główkę nuty, jest traktowana jako połączone nuty.
