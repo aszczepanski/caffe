@@ -6,6 +6,7 @@
 \usepackage{fullpage}
 \usepackage{color}
 \usepackage{url}
+\usepackage{array}
 
 \title{Music OCR}
 \author{
@@ -24,9 +25,46 @@
 
 \section{Opis algorytmu}
 
-\section{Podsumowanie}
+\subsection{Rozpoznawanie nut}
 
-Dużo informacji w~\cite{10strategies}.
+Do rozpoznawania nut wykorzystano \emph{caffe} -- framework deep learning~\cite{jia2014caffe} rozwijany przez \emph{Berkeley Vision and Learning Center}. Platforma umożliwia szybkie i~modularne uczenie modeli w~oparciu o~sieci opisane w~plikach tekstowych i~przygotowane zbiory treningowy i~walidujący z~obrazkami.
+
+Przygotowano zbiór uczący składający się z~341 obrazków i~zbiór walidujący składający się z~274 obrazków. Oba zbiory zawierają zarówno znaki drukowane jak i~pisane ręcznie. Liczności poszczególnych znaków znajdują się w~tabeli~\ref{tab:train_val}.
+
+\begin{table}
+\centering
+\begin{tabular}{l|c|c}
+znak & zbiór uczący & zbiór walidujący \\ \hline
+klucz wiolinowy & 40 & 22 \\
+klucz basowy & 40 & 29 \\
+cała nuta & 40 & 34 \\
+półnuta & 41 & 33 \\
+ćwierćnuta & 40 & 40 \\
+ósemka & 50 & 35 \\
+pauza ćwierćnutowa & 40 & 31 \\
+kreska takotwa & 50 & 50 \\ \hline
+razem & 341 & 274 \\
+\end{tabular}
+\caption{Liczności zbiorów uczących i~walidujących.}
+\label{tab:train_val}
+\end{table}
+
+Przed rozpocząciem procesu uczenia wszystkie obrazki zostały przekonwertowane do odcieni szarości, przeskalowane do rozmiarów 256x256 i~zgromadzone w jednej bazie danych wspieranej przez \emph{caffe} oraz obliczona została ich średnia jasności obrazów. Wykorzystana sieć neuronowa składa się z~8 głównych warstw.
+
+Warstwa wejściowa pobiera obrazy z~bazy danych. Następnie 5~warstw konwolucyjnych -- splatająca obraz który otrzymuje na wejściu ze zbiorem masek podlegających uczeniu, z~których każda produkuje osobny wynik wykorzystywany w~kolejnej warstwie. Pomiędzy warstwami konwolucyjnymi występują warstwy normalizujące, ReLU (zwracające \emph{max(x,0)} oraz MaxPooling (wybierające dla rozłącznych regionów maksymalne wartości). Następnie w~sieci znajdują się 3~warstwy w~pełni połączone -- traktujące wejście jako wektor i~dające na wyjściu wektor. Pomiędzy tymi warstwami znajdują się warstwy normalizującem ReLU oraz Dropout (odrzucająca część danych podczas uczenia). Warstwa wyjściowa zwraca dla każdego rozpoznawanego znaku prawdopodobieństwo, że klasyfikator zaklasyfikował obrazek jako ten znak.
+
+Wykorzystane zostały parametry uczenia:
+\begin{itemize}
+\item Prędkość uczenia: 0.01
+\item Momentum: 45000
+\item Weight decay: 0.0005
+\end{itemize}
+
+Model był zapisywany do pliku co 50 iteracji i~był testowany co 100 iteracji. Otrzymany po 1800 iteracjach model daje trafność 95.9\% na zbiorze walidującym.
+
+Wykorzystana sieć wzorowana była na~\dots.
+
+\section{Podsumowanie}
 
 \bibliography{report}
 \bibliographystyle{plain}
