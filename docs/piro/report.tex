@@ -7,12 +7,15 @@
 \usepackage{color}
 \usepackage{url}
 \usepackage{array}
+\usepackage{graphicx}
 \usepackage{listings}
 
 \lstset{%
 	breaklines=true,
 	postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\color{red}\hookrightarrow\space}}
 }
+
+\graphicspath{{img/}}
 
 \title{Music OCR}
 \author{
@@ -35,7 +38,23 @@ Aby uruchomić program, należy wywołać go z parametrami plików modelu i plik
 build/examples/piro/classification.bin NetDescriptionFile CaffeModel ImageMeanFile SynsetWordsFile InputFile
 \end{lstlisting}
 
-Jako wynik, wyprodukowany zostanie plik html w folderze results. Otworzony w przeglądarce wygeneruje wizualizację nut.
+Przykładowy obraz \texttt{InputFile} został przedstawiony na rysunku~\ref{fig:in}.
+
+Jako wynik, wyprodukowany zostanie plik html w folderze results. Otworzony w przeglądarce wygeneruje wizualizację nut. Przykładowy wynik został przedstawiony na rysunku~\ref{fig:out}.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{in.jpg}
+\caption{Obraz podawany na wejście programu}
+\label{fig:in}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{out.png}
+\caption{Obraz uzyskiwany na wyjściu programu}
+\label{fig:out}
+\end{figure}
 
 \section{Wspierane znaki}
 
@@ -78,12 +97,19 @@ Podobna operacja wykonywana jest też wertykalnie, aby wspomóc proces ekstrakcj
 
 Wyodrębniane linie, po dodatkowej dylatacji pionowej, odejmowane są od orginalnego obrazu.
 W celu poprawy wyniku dodaje się wyodrębnione wcześniej elementy wertykalne.
-Następnie obraz jest ponownie progowany, prowadząc do obrazu zawierającego same nuty.
+Następnie obraz jest ponownie progowany, prowadząc do obrazu zawierającego same nuty. Przykładowy efekt usuwania linii został przedstawiony na rysunku~\ref{fig:notes}.
 
 W międzyczasie, wyekstraktowane linie przetwarzane są w celu znalezienia głównych pięciu, wykorzystywanych do szacowania wysokości.
 Na obrazie sumowane są pixele w każdym wierszu, i progowane 30\% maksymalnej wartości.
 W ten sposób otrzymywani są kandydaci na pięciolinię. następnie bliscy kandydaci łączeni są w jednych, po czym wybierane jest 5 najwyższych wartości.
 Pozycje linii są zapisane, wraz ze średnią odległością między liniami.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{notes.jpg}
+\caption{Wycięte linie}
+\label{fig:notes}
+\end{figure}
 
 \subsection{Segmentacja nut}
 Segmentacja nut przeprowadzana jest na wyekstraktowanych symbolach z poprzedniego kroku.
@@ -101,30 +127,17 @@ Kandydatami pozostają grupy, które są szerokie na przynajmniej połowę szero
 W ten sposób otrzymujemy listę możliwych główek nut.  Jeśli lista zawiera więcej niż jedną główkę nuty, jest traktowana jako połączone nuty.
 Jeśli nie, traktowana jest jako pojedynczy symbol. Pojedyncze symbole przechodzą do fazy rozpoznawania i wykrywania wysokości.
 Połączone traktowane są jako ósemki i przechodzą bezpośrednio do fazy wykrywania wysokości.
+Wynik segmentacji nut został przedstawiony na rysunku~\ref{fig:argb}.
 
-\subsection{Wykrywanie wysokości}
-Dla wyciętego już obrazu nuty, wyszukuje się prawdopodobnej pozycji na pięciolinii.
-Na początku przetwarzania, liczy się przedziały przynależności nut do wysokości.
-Dla wcześniej wyznaczonych pozycjii pięciu linii, zapisywane są przedziały przynależności - dla położenia na linii -
-$<PozycjaLinii - 0.25 * SzerokośćLinii, PozycjaLinii + 0.25 * SzerokośćLinii>$ - dla położenia pomiędzy liniami -
-$<PozycjaDolnejLinii + 0.25 * SzerokośćLinii, PozycjaGórnejLinii - 0.25 * SzerokośćLinii>$.
-Analogicznie szacowane są pozycje nut poniżej i powyżej pięciolinii.
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{argb.jpg}
+\caption{Wynik segmentacji}
+\label{fig:argb}
+\end{figure}
 
-Następnie dla nuty, liczone są pixele w każdym rzędzie, thresholdowane 30\% maksymalnej wartości, i grupowane w spójne przedziały.
-Znajdowany jest najdłuższy przedział i jest traktowany jako główka nuty
-(Wybrano najdłuższy przedział a nie najgęstrzy segment, ponieważ półnuty są puste w środku i mogą być łatwo przewyższone szumem z innych miejsc).
-Dla znalezionego już przedziału, liczy się środek ciężkości jako wyznacznik położenia nuty.
 
-Mając przewidywane położenie nuty, sprawdza się przynależność do przedziałów i przypisuję wysokość nucie.
-
-\subsection{Wizualizacja}
-Do wizualizacji wykorzystywana jest biblioteka VecFlow, pozwalająca na renderowanie pięciolinii w przeglądarce, za pomocą JavaScript.
-Kod generuje gotowy plik html, z kodem w JS generujący gotową pięciolinię.
-Wygenerowane nuty, mogą wizualnie różnić się od tych czytanych,
-np. pionowa kreska nuty może być skierowana w dół a nie w górę, itd. ponieważ algorytm rysowania sam dobiera takie parametry.
-Merytorycznie jednak, wygenerowane nuty mają takie same znaczenie.
-
-\subsection{Rozpoznawanie nut}
+\subsection{Rozpoznawanie symboli}
 
 Do rozpoznawania nut wykorzystano \emph{caffe} -- framework deep learning~\cite{jia2014caffe} rozwijany przez \emph{Berkeley Vision and Learning Center}. Platforma umożliwia szybkie i~modularne uczenie modeli w~oparciu o~sieci opisane w~plikach tekstowych i~przygotowane zbiory treningowy i~walidujący z~obrazkami.
 
@@ -148,7 +161,7 @@ razem & 341 & 274 \\
 \label{tab:train_val}
 \end{table}
 
-Przed rozpocząciem procesu uczenia wszystkie obrazki zostały przekonwertowane do odcieni szarości, przeskalowane do rozmiarów 256x256 i~zgromadzone w jednej bazie danych wspieranej przez \emph{caffe} oraz obliczona została ich średnia jasności obrazów. Wykorzystana sieć neuronowa składa się z~8 głównych warstw.
+Przed rozpocząciem procesu uczenia wszystkie obrazki zostały przekonwertowane do odcieni szarości, przeskalowane do rozmiarów 256x256 i~zgromadzone w jednej bazie danych wspieranej przez \emph{caffe} oraz obliczona została ich średnia jasności obrazów. Wykorzystana sieć neuronowa składa się z~8 głównych warstw ukrytych.
 
 Warstwa wejściowa pobiera obrazy z~bazy danych. Następnie 5~warstw konwolucyjnych -- splatająca obraz który otrzymuje na wejściu ze zbiorem masek podlegających uczeniu, z~których każda produkuje osobny wynik wykorzystywany w~kolejnej warstwie. Pomiędzy warstwami konwolucyjnymi występują warstwy normalizujące, ReLU (zwracające \emph{max(x,0)} oraz MaxPooling (wybierające dla rozłącznych regionów maksymalne wartości). Następnie w~sieci znajdują się 3~warstwy w~pełni połączone -- traktujące wejście jako wektor i~dające na wyjściu wektor. Pomiędzy tymi warstwami znajdują się warstwy normalizującem ReLU oraz Dropout (odrzucająca część danych podczas uczenia). Warstwa wyjściowa zwraca dla każdego rozpoznawanego znaku prawdopodobieństwo, że klasyfikator zaklasyfikował obrazek jako ten znak.
 
@@ -162,6 +175,28 @@ Wykorzystane zostały parametry uczenia:
 Model był zapisywany do pliku co 50 iteracji i~był testowany co 100 iteracji. Otrzymany po 1800 iteracjach model daje trafność 95.9\% na zbiorze walidującym.
 
 Wykorzystana sieć wzorowana była na~\cite{NIPS2012_4824}.
+
+\subsection{Wykrywanie wysokości}
+Dla wyciętego już obrazu nuty, wyszukuje się prawdopodobnej pozycji na pięciolinii.
+Na początku przetwarzania, liczy się przedziały przynależności nut do wysokości.
+Dla wcześniej wyznaczonych pozycjii pięciu linii, zapisywane są przedziały przynależności - dla położenia na linii -
+$<PozycjaLinii - 0.25 * SzerokośćLinii, PozycjaLinii + 0.25 * SzerokośćLinii>$ - dla położenia pomiędzy liniami -
+$<PozycjaDolnejLinii + 0.25 * SzerokośćLinii, PozycjaGórnejLinii - 0.25 * SzerokośćLinii>$.
+Analogicznie szacowane są pozycje nut poniżej i powyżej pięciolinii.
+
+Następnie dla nuty, liczone są pixele w każdym rzędzie, thresholdowane 30\% maksymalnej wartości, i grupowane w spójne przedziały.
+Znajdowany jest najdłuższy przedział i jest traktowany jako główka nuty
+(Wybrano najdłuższy przedział a nie najgęstrzy segment, ponieważ półnuty są puste w środku i mogą być łatwo przewyższone szumem z innych miejsc).
+Dla znalezionego już przedziału, liczy się środek ciężkości jako wyznacznik położenia nuty.
+
+Mając przewidywane położenie nuty, sprawdza się przynależność do przedziałów i przypisuję wysokość nucie.
+
+\subsection{Wizualizacja}
+Do wizualizacji wykorzystywana jest biblioteka VecFlow, pozwalająca na renderowanie pięciolinii w przeglądarce, za pomocą JavaScript.
+Kod generuje gotowy plik html, z kodem w JS generujący gotową pięciolinię.
+Wygenerowane nuty, mogą wizualnie różnić się od tych czytanych,
+np. pionowa kreska nuty może być skierowana w dół a nie w górę, itd. ponieważ algorytm rysowania sam dobiera takie parametry.
+Merytorycznie jednak, wygenerowane nuty mają takie same znaczenie.
 
 \section{Podsumowanie}
 
