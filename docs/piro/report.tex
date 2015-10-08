@@ -7,6 +7,12 @@
 \usepackage{color}
 \usepackage{url}
 \usepackage{array}
+\usepackage{listings}
+
+\lstset{%
+	breaklines=true,
+	postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\color{red}\hookrightarrow\space}}
+}
 
 \title{Music OCR}
 \author{
@@ -21,9 +27,102 @@
 
 \section{Zasada działania}
 
+Projekt napisany jest w C++. Aby skompilować kod wystarczy wywołać komendę make.
+
+Aby uruchomić program, należy wywołać go z parametrami plików modelu i plikiem wejściowym
+
+\begin{lstlisting}
+build/examples/piro/classification.bin NetDescriptionFile CaffeModel ImageMeanFile SynsetWordsFile InputFile
+\end{lstlisting}
+
+Jako wynik, wyprodukowany zostanie plik html w folderze results. Otworzony w przeglądarce wygeneruje wizualizację nut.
+
 \section{Wspierane znaki}
 
+Algorytm wspiera poniższy zbiór symboli muzycznych
+\begin{itemize}
+\item Klucze
+  \begin{itemize}
+  \item Klucz wiolinowy
+  \item Klucz basowy
+  \end{itemize}
+\item Nuty
+  \begin{itemize}
+  \item Cała nuta
+  \item Półnuta
+  \item Ćwierćnuta
+  \item Ósemka
+  \item Połączone ósemki
+  \end{itemize}
+\item Pauza ćwierćnutowa
+\item Kreska taktowa
+\end{itemize}
+
 \section{Opis algorytmu}
+
+Algorytm składa się z kilku kroków, zaczynając od obrazu z pojedynczą pięciolinią.
+\begin{itemize}
+\item Wstępne przetwarzanie obrazu
+\item Wykrywanie pięciolinii i wyodrębnianie symboli z obrazu
+\item Segmentacja symboli
+\item Rozpoznawanie symboli
+\item Wykrywanie wysokości
+\item Wizualizacja
+\end{itemize}
+
+\subsection{Wykrywanie linii i nut}
+Pierwszym krokiem algorytmu jest znalezienie i usunięcie pięciolini z obrazu.
+Po wstępnym thresholdowaniu i zmiany obrazu na binarny, wywoływana jest erozja i dylatacja, z kernelem w postaci macierzy 1 x width/30.
+w ten sposób na obrazie zostają tylko poziome linie.
+Podobna operacja wykonywana jest też wertykalnie, aby wspomóc proces ekstrakcji znaków opisany dalej.
+
+Wyodrębniane linie, po dodatkowej dylatacji pionowej, odejmowane są od orginalnego obrazu.
+W celu poprawy wyniku dodaje się wyodrębnione wcześniej elementy wertykalne.
+Następnie obraz jest ponownie progowany, prowadząc do obrazu zawierającego same nuty.
+
+W międzyczasie, wyekstraktowane linie przetwarzane są w celu znalezienia głównych pięciu, wykorzystywanych do szacowania wysokości.
+Na obrazie sumowane są pixele w każdym wierszu, i progowane 30\% maksymalnej wartości.
+W ten sposób otrzymywani są kandydaci na pięciolinię. następnie bliscy kandydaci łączeni są w jednych, po czym wybierane jest 5 najwyższych wartości.
+Pozycje linii są zapisane, wraz ze średnią odległością między liniami.
+
+\subsection{Segmentacja nut}
+Segmentacja nut przeprowadzana jest na wyekstraktowanych symbolach z poprzedniego kroku.
+Dla każdej kolumny sprawdzana jest zawartość czarnych pixeli i grupowane są kolejne kolumny które takie pixele zawierają.
+Następnie łączone są grupy odległe o mniej niż połowa szerokości linii - w ten sposób unikając błędów wynikających z niedokładnych skanów lub niedokładnie narysowanych nut.
+Jako wynik otrzymujemy listę grup w postaci zakresów kolumn, w których mogą znajdować się symbole.
+
+Jako kolejny krok, wykonywane jest sprawdzenie, czy grupa zawiera pojedynczy symbol, czy połączoną grupę nut.
+Przy obserwacji, że połączone nuty zawsze są pełne w środku, można podjąć się szukania główek nut w grupach jako wyznacznik czy grupa jest pojedynczym symbolem czy grupą nut.
+
+Wyszukiwanie główek nut, odbywa się poprzez znalezienie w każdej kolumnie najdłuższego ciągu czarnych pixeli.
+Kandydatami są ciągi o długości większej niż połowa wysokości linii, i mniejszej niż półtora wysokości linii.
+kandydaci grupowani są w grupy, jeśli są odległe od siebie nie więcej niż 2 pixele (dopuszczenie szumów).
+Kandydatami pozostają grupy, które są szerokie na przynajmniej połowę szerokości linii.
+W ten sposób otrzymujemy listę możliwych główek nut.  Jeśli lista zawiera więcej niż jedną główkę nuty, jest traktowana jako połączone nuty.
+Jeśli nie, traktowana jest jako pojedynczy symbol. Pojedyncze symbole przechodzą do fazy rozpoznawania i wykrywania wysokości.
+Połączone traktowane są jako ósemki i przechodzą bezpośrednio do fazy wykrywania wysokości.
+
+\subsection{Wykrywanie wysokości}
+Dla wyciętego już obrazu nuty, wyszukuje się prawdopodobnej pozycji na pięciolinii.
+Na początku przetwarzania, liczy się przedziały przynależności nut do wysokości.
+Dla wcześniej wyznaczonych pozycjii pięciu linii, zapisywane są przedziały przynależności - dla położenia na linii -
+$<PozycjaLinii - 0.25 * SzerokośćLinii, PozycjaLinii + 0.25 * SzerokośćLinii>$ - dla położenia pomiędzy liniami -
+$<PozycjaDolnejLinii + 0.25 * SzerokośćLinii, PozycjaGórnejLinii - 0.25 * SzerokośćLinii>$.
+Analogicznie szacowane są pozycje nut poniżej i powyżej pięciolinii.
+
+Następnie dla nuty, liczone są pixele w każdym rzędzie, thresholdowane 30\% maksymalnej wartości, i grupowane w spójne przedziały.
+Znajdowany jest najdłuższy przedział i jest traktowany jako główka nuty
+(Wybrano najdłuższy przedział a nie najgęstrzy segment, ponieważ półnuty są puste w środku i mogą być łatwo przewyższone szumem z innych miejsc).
+Dla znalezionego już przedziału, liczy się środek ciężkości jako wyznacznik położenia nuty.
+
+Mając przewidywane położenie nuty, sprawdza się przynależność do przedziałów i przypisuję wysokość nucie.
+
+\subsection{Wizualizacja}
+Do wizualizacji wykorzystywana jest biblioteka VecFlow, pozwalająca na renderowanie pięciolinii w przeglądarce, za pomocą JavaScript.
+Kod generuje gotowy plik html, z kodem w JS generujący gotową pięciolinię.
+Wygenerowane nuty, mogą wizualnie różnić się od tych czytanych,
+np. pionowa kreska nuty może być skierowana w dół a nie w górę, itd. ponieważ algorytm rysowania sam dobiera takie parametry.
+Merytorycznie jednak, wygenerowane nuty mają takie same znaczenie.
 
 \subsection{Rozpoznawanie nut}
 
@@ -35,14 +134,14 @@ Przygotowano zbiór uczący składający się z~341 obrazków i~zbiór walidują
 \centering
 \begin{tabular}{l|c|c}
 znak & zbiór uczący & zbiór walidujący \\ \hline
-klucz wiolinowy & 40 & 22 \\
-klucz basowy & 40 & 29 \\
-cała nuta & 40 & 34 \\
-półnuta & 41 & 33 \\
-ćwierćnuta & 40 & 40 \\
-ósemka & 50 & 35 \\
-pauza ćwierćnutowa & 40 & 31 \\
-kreska takotwa & 50 & 50 \\ \hline
+Klucz wiolinowy & 40 & 22 \\
+Klucz basowy & 40 & 29 \\
+Cała nuta & 40 & 34 \\
+Półnuta & 41 & 33 \\
+Ćwierćnuta & 40 & 40 \\
+Ósemka & 50 & 35 \\
+Pauza ćwierćnutowa & 40 & 31 \\
+Kreska takotwa & 50 & 50 \\ \hline
 razem & 341 & 274 \\
 \end{tabular}
 \caption{Liczności zbiorów uczących i~walidujących.}
@@ -62,7 +161,7 @@ Wykorzystane zostały parametry uczenia:
 
 Model był zapisywany do pliku co 50 iteracji i~był testowany co 100 iteracji. Otrzymany po 1800 iteracjach model daje trafność 95.9\% na zbiorze walidującym.
 
-Wykorzystana sieć wzorowana była na~\dots.
+Wykorzystana sieć wzorowana była na~\cite{NIPS2012_4824}.
 
 \section{Podsumowanie}
 
