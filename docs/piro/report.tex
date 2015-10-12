@@ -133,7 +133,7 @@ Wynik segmentacji nut został przedstawiony na rysunku~\ref{fig:argb}.
 \begin{figure}
 \centering
 \includegraphics[width=0.8\textwidth]{argb.jpg}
-\caption{Wynik segmentacji}
+\caption{Wynik segmentacji. Żółte i fioletowe segmenty oznaczają pojedyncze nuty. Niebieskie i zielone oznaczają główki nut połączonych.}
 \label{fig:argb}
 \end{figure}
 
@@ -155,7 +155,7 @@ Półnuta & 41 & 33 \\
 Ćwierćnuta & 40 & 40 \\
 Ósemka & 50 & 35 \\
 Pauza ćwierćnutowa & 40 & 31 \\
-Kreska takotwa & 50 & 50 \\ \hline
+Kreska taktowa & 50 & 50 \\ \hline
 razem & 341 & 274 \\
 \end{tabular}
 \caption{Liczności zbiorów uczących i~walidujących.}
@@ -244,6 +244,34 @@ Kod generuje gotowy plik html, z kodem w JS generujący gotową pięciolinię.
 Wygenerowane nuty, mogą wizualnie różnić się od tych czytanych,
 np. pionowa kreska nuty może być skierowana w dół a nie w górę, itd. ponieważ algorytm rysowania sam dobiera takie parametry.
 Merytorycznie jednak, wygenerowane nuty mają takie same znaczenie.
+
+\section{Wyniki testów}
+Testy przeprowadzono na ponad 300 nutach narysowanych odręcznie. Wyniki przedstawione są poniżej.
+Widać spory problem z segmentacją całych nut i półnut, spowodowany problemami z wycinaniem dolnych części nut w pewnych przypadkach.
+Problemy z segmentacją występują również dla ósemek, które spowodowane są głównie przerywanymi połączeniami między nutmami.
+Przy klasyfikacji główny problem pojawia się w przypadku klucza basowego - spowodowanego wycinaniem górnej części klucza w większości przypadków -
+oraz dla pauz - które w formie odręcznej różnią się między sobą znacząco.
+
+\begin{table}
+\centering
+\begin{tabular}{|r|r|r|r|}
+\hline
+Znak | Błąd & bł. segmentacji & bł. klasyfikacji & bł. wykr. wysokości \\ \hline
+Klucz wiolinowy & 1.6\% & 4.8\% & - \\
+Klucz basowy & 2.9\% & 10.8\% & - \\
+Cała nuta & 20.2\% & 5.5\% & 5.4\%\\
+Półnuta & 9.6\% & 5.4\% & 6.7\% \\
+Ćwierćnuta & 0\% & 2.5\% & 1.3\% \\
+Ósemka & 9.4\% & 3.5\% & 10.5\% \\
+Pauza ćwierćnutowa & 7\% & 14.1\% & - \\
+Kreska taktowa & 2\% & 8\% & - \\ \hline
+
+\end{tabular}
+\caption{Procent błędów każdego typu, dla wszystkich rozpoznawanych znaków.}
+\label{tab:test_results}
+\end{table}
+
+
 
 \bibliography{report}
 \bibliographystyle{plain}
