@@ -192,7 +192,7 @@ Dla znalezionego już przedziału, liczy się środek ciężkości jako wyznaczn
 
 Mając przewidywane położenie nuty, sprawdza się przynależność do przedziałów i przypisuję wysokość nucie.
 
-\begin{figure}
+\begin{figure}[!bt]
 \centering
 \subfloat[klucz wiolinowy]{
 	\hspace*{16pt}
@@ -239,20 +239,20 @@ Mając przewidywane położenie nuty, sprawdza się przynależność do przedzia
 \end{figure}
 
 \subsection{Wizualizacja}
-Do wizualizacji wykorzystywana jest biblioteka VecFlow, pozwalająca na renderowanie pięciolinii w przeglądarce, za pomocą JavaScript.
+Do wizualizacji wykorzystywana jest biblioteka VexFlow, pozwalająca na renderowanie pięciolinii w przeglądarce, za pomocą JavaScript.
 Kod generuje gotowy plik html, z kodem w JS generujący gotową pięciolinię.
 Wygenerowane nuty, mogą wizualnie różnić się od tych czytanych,
 np. pionowa kreska nuty może być skierowana w dół a nie w górę, itd. ponieważ algorytm rysowania sam dobiera takie parametry.
 Merytorycznie jednak, wygenerowane nuty mają takie same znaczenie.
 
 \section{Wyniki testów}
-Testy przeprowadzono na ponad 300 nutach narysowanych odręcznie. Wyniki przedstawione są poniżej.
+Testy przeprowadzono na ponad 600 nutach narysowanych odręcznie. Wyniki przedstawione są poniżej.
 Widać spory problem z segmentacją całych nut i półnut, spowodowany problemami z wycinaniem dolnych części nut w pewnych przypadkach.
 Problemy z segmentacją występują również dla ósemek, które spowodowane są głównie przerywanymi połączeniami między nutmami.
 Przy klasyfikacji główny problem pojawia się w przypadku klucza basowego - spowodowanego wycinaniem górnej części klucza w większości przypadków -
 oraz dla pauz - które w formie odręcznej różnią się między sobą znacząco.
 
-\begin{table}
+\begin{table}[!ht]
 \centering
 \begin{tabular}{|r|r|r|r|}
 \hline
