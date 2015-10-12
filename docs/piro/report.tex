@@ -9,6 +9,7 @@
 \usepackage{array}
 \usepackage{graphicx}
 \usepackage{listings}
+\usepackage[caption=false]{subfig}
 
 \lstset{%
 	breaklines=true,
@@ -141,7 +142,7 @@ Wynik segmentacji nut został przedstawiony na rysunku~\ref{fig:argb}.
 
 Do rozpoznawania nut wykorzystano \emph{caffe} -- framework deep learning~\cite{jia2014caffe} rozwijany przez \emph{Berkeley Vision and Learning Center}. Platforma umożliwia szybkie i~modularne uczenie modeli w~oparciu o~sieci opisane w~plikach tekstowych i~przygotowane zbiory treningowy i~walidujący z~obrazkami.
 
-Przygotowano zbiór uczący składający się z~341 obrazków i~zbiór walidujący składający się z~274 obrazków. Oba zbiory zawierają zarówno znaki drukowane jak i~pisane ręcznie. Liczności poszczególnych znaków znajdują się w~tabeli~\ref{tab:train_val}.
+Przygotowano zbiór uczący składający się z~341 obrazków i~zbiór walidujący składający się z~274 obrazków. Oba zbiory zawierają zarówno znaki drukowane jak i~pisane ręcznie. Liczności poszczególnych znaków znajdują się w~tabeli~\ref{tab:train_val}. Przykładowe rozpoznawane znaki znajdują się na rysunku~\ref{fig:crops}.
 
 \begin{table}
 \centering
@@ -190,6 +191,52 @@ Znajdowany jest najdłuższy przedział i jest traktowany jako główka nuty
 Dla znalezionego już przedziału, liczy się środek ciężkości jako wyznacznik położenia nuty.
 
 Mając przewidywane położenie nuty, sprawdza się przynależność do przedziałów i przypisuję wysokość nucie.
+
+\begin{figure}
+\centering
+\subfloat[klucz wiolinowy]{
+	\hspace*{16pt}
+	\includegraphics[width=0.08\textwidth]{crop_tc.jpg}
+	\hspace*{16pt}
+}\hfill
+\subfloat[klucz basowy]{
+	\hspace*{16pt}
+	\includegraphics[width=0.08\textwidth]{crop_bc.jpg}
+	\hspace*{16pt}
+}\hfill
+\subfloat[kreska taktowa]{
+	\hspace*{16pt}
+	\includegraphics[width=0.08\textwidth]{crop_bar.jpg}
+	\hspace*{16pt}
+}\hfill
+\subfloat[pauza]{
+	\hspace*{16pt}
+	\includegraphics[width=0.08\textwidth]{crop_n4.jpg}
+	\hspace*{16pt}
+} \\
+\subfloat[cała nuta]{
+	\hspace*{16pt}
+	\includegraphics[width=0.08\textwidth]{crop_n1.jpg}
+	\hspace*{16pt}
+}\hfill
+\subfloat[półnuta]{
+	\hspace*{16pt}
+	\includegraphics[width=0.08\textwidth]{crop_n2.jpg}
+	\hspace*{16pt}
+}\hfill
+\subfloat[ćwierćnuta]{
+	\hspace*{16pt}
+	\includegraphics[width=0.08\textwidth]{crop_n4.jpg}
+	\hspace*{16pt}
+}\hfill
+\subfloat[ósemka]{
+	\hspace*{16pt}
+	\includegraphics[width=0.08\textwidth]{crop_n8.jpg}
+	\hspace*{16pt}
+}
+\caption{Rozpoznawane znaki}
+\label{fig:crops}
+\end{figure}
 
 \subsection{Wizualizacja}
 Do wizualizacji wykorzystywana jest biblioteka VecFlow, pozwalająca na renderowanie pięciolinii w przeglądarce, za pomocą JavaScript.
